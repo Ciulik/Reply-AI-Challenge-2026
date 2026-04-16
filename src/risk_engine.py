@@ -1,0 +1,38 @@
+def build_user_profiles(df):
+    profiles = {}
+
+    for _, row in df.iterrows():
+        user = row["sender_id"]
+        amount = row["amount"]
+
+        if user not in profiles:
+            profiles[user] = {"total": 0, "count": 0}
+
+        profiles[user]["total"] += amount
+        profiles[user]["count"] += 1
+
+    for user in profiles:
+        profiles[user]["avg"] = profiles[user]["total"] / profiles[user]["count"]
+
+    return profiles
+
+
+def compute_risk(row, profile):
+    risk = 0
+
+    amount = row["amount"]
+    avg = profile.get("avg", 0)
+
+    if avg > 0 and amount > avg * 3:
+        risk += 2
+
+    timestamp = row["timestamp"]
+    hour = int(timestamp.split("T")[1].split(":")[0])
+
+    if hour < 6:
+        risk += 1
+
+    if row["transaction_type"] not in ["bank transfer"]:
+        risk += 1
+
+    return risk
