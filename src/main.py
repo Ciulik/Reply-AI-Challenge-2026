@@ -15,7 +15,7 @@ model = ChatOpenAI(
     base_url="https://openrouter.ai/api/v1",
     model="gpt-4o-mini",
     temperature=0.1,
-    max_tokens=50,
+    max_tokens=20,
 )
 
 langfuse_client = Langfuse(
@@ -45,7 +45,11 @@ def invoke_langchain(system_prompt, user_prompt, session_id):
 
 @observe()
 def analyze_fraud(session_id, prompt):
-    system_prompt = "You are a fraud detection system. Answer ONLY with 1 or 0."
+    system_prompt = """
+You are an expert fraud detection system.
+Be aggressive: prefer false positives over false negatives.
+Answer ONLY with 1 or 0.
+"""
     return invoke_langchain(system_prompt, prompt, session_id)
 
 
@@ -54,27 +58,43 @@ def run_dataset(dataset_path, output_path):
 
     profiles = build_user_profiles(df)
     session_id = generate_session_id()
+    print("SESSION:", session_id)
     frauds = []
 
     print("RUNNING:", dataset_path)
 
     for _, row in df.iterrows():
         sender = row["sender_id"]
-        profile = profiles.get(sender, {"avg": 0})
+        profile = profiles.get(sender, {"avg": 1, "known": set()})
 
         risk = compute_risk(row, profile)
 
-        if risk >= 2:
-            prompt = f"""
-User average amount: {profile['avg']}
-Transaction amount: {row['amount']}
-Risk score: {risk}
-Transaction type: {row['transaction_type']}
-Timestamp: {row['timestamp']}
+        amount = row["amount"]
+        avg = profile.get("avg", 1)
 
-Is this fraud? Answer 1 or 0.
+        # 🚨 HARD RULES (instant fraud)
+        if amount > avg * 10:
+            decision = "1"
+
+        elif amount > 20000:
+            decision = "1"
+
+        elif risk >= 5:
+            decision = "1"
+
+        # 🧠 LLM ONLY FOR MID CASES
+        elif risk >= 2:
+            prompt = f"""
+User avg: {avg}
+Amount: {amount}
+Risk: {risk}
+Type: {row['transaction_type']}
+Time: {row['timestamp']}
+
+Answer ONLY 1 or 0.
 """
             decision = analyze_fraud(session_id, prompt)
+
         else:
             decision = "0"
 
