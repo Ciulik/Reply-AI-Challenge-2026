@@ -26,10 +26,10 @@ def build_user_profiles(df):
 def compute_risk(row, profile):
     risk = 0
 
-    amount = row["amount"]
+    amount = float(row["amount"])
     avg = profile.get("avg", 1)
 
-    if amount > avg * 5:
+    if amount > avg * 4:
         risk += 3
 
     if amount > avg * 10:
@@ -38,9 +38,12 @@ def compute_risk(row, profile):
     if amount > 10000:
         risk += 2
 
-    hour = int(row["timestamp"].split("T")[1].split(":")[0])
-    if hour < 5:
-        risk += 2
+    try:
+        hour = int(row["timestamp"].split("T")[1].split(":")[0])
+        if hour < 5:
+            risk += 2
+    except:
+        pass
 
     if row["transaction_type"] not in ["bank transfer"]:
         risk += 1
